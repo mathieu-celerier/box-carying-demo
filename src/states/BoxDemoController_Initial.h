@@ -2,7 +2,7 @@
 
 #include <mc_control/fsm/State.h>
 
-struct NewFSMController_Initial : mc_control::fsm::State
+struct BoxDemoController_Initial : mc_control::fsm::State
 {
 
   void configure(const mc_rtc::Configuration & config) override;
@@ -14,4 +14,5 @@ struct NewFSMController_Initial : mc_control::fsm::State
   void teardown(mc_control::fsm::Controller & ctl) override;
 
 private:
+  bool next;
 };

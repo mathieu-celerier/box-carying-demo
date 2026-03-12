@@ -1,5 +1,5 @@
-#include "NewFSMController.h"
+#include "BoxDemoController.h"
 
 #include <mc_control/mc_controller.h>
 
-CONTROLLER_CONSTRUCTOR("NewFSMController", NewFSMController)
+CONTROLLER_CONSTRUCTOR("BoxDemoController", BoxDemoController)

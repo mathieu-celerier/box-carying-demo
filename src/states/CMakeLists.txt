@@ -1,3 +1,4 @@
-add_fsm_state_simple(NewFSMController_Initial)
+add_fsm_state_simple(BoxDemoController_Initial)
+add_fsm_state_simple(BoxDemoController_Compliance)
 
 add_fsm_data_directory(data)
