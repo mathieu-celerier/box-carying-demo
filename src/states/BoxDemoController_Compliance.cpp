@@ -5,9 +5,68 @@
 #include <algorithm>
 #include <cmath>
 
+namespace
+{
+
+} // namespace
+
 void BoxDemoController_Compliance::configure(const mc_rtc::Configuration & config)
 {
-  residualGain = 10.0;
+  config("residualGain", residualGain);
+  config("xyComplianceOnThreshold", xyComplianceOnThreshold);
+  config("xyComplianceOffThreshold", xyComplianceOffThreshold);
+  config("dFZComplianceOnThreshold", dFZComplianceOnThreshold);
+  config("dFZComplianceOffThreshold", dFZComplianceOffThreshold);
+  config("rotationYComplianceOnThreshold", rotationYComplianceOnThreshold);
+  config("rotationYComplianceOffThreshold", rotationYComplianceOffThreshold);
+  config("rotationYComplianceXThreshold", rotationYComplianceYThreshold);
+  config("complianceGain", complianceGain);
+  config("nominalPositionStiffness", nominalPositionStiffness);
+  config("nominalPositionDamping", nominalPositionDamping);
+  config("compliantPositionStiffness", compliantPositionStiffness);
+  config("compliantPositionDamping", compliantPositionDamping);
+  config("nominalOrientationStiffness", nominalOrientationStiffness);
+  config("nominalOrientationDamping", nominalOrientationDamping);
+  config("compliantOrientationStiffness", compliantOrientationStiffness);
+  config("compliantOrientationDamping", compliantOrientationDamping);
+  xyForceCompliantOrientationStiffness = compliantOrientationStiffness;
+  xyForceCompliantOrientationDamping = compliantOrientationDamping;
+  rotationYCompliantOrientationStiffness = compliantOrientationStiffness;
+  rotationYCompliantOrientationDamping = compliantOrientationDamping;
+  config("xyForceCompliantOrientationStiffness", xyForceCompliantOrientationStiffness);
+  config("xyForceCompliantOrientationDamping", xyForceCompliantOrientationDamping);
+  config("rotationYCompliantOrientationStiffness", rotationYCompliantOrientationStiffness);
+  config("rotationYCompliantOrientationDamping", rotationYCompliantOrientationDamping);
+  config("gainTransitionTime", gainTransitionTime);
+
+  residualGain = std::max(0.1, residualGain);
+  xyComplianceOnThreshold = std::max(0.0, xyComplianceOnThreshold);
+  xyComplianceOffThreshold = std::max(0.0, std::min(xyComplianceOffThreshold, xyComplianceOnThreshold));
+  dFZComplianceOnThreshold = std::max(0.0, dFZComplianceOnThreshold);
+  dFZComplianceOffThreshold = std::max(0.0, std::min(dFZComplianceOffThreshold, dFZComplianceOnThreshold));
+  rotationYComplianceOnThreshold = std::max(0.0, rotationYComplianceOnThreshold);
+  rotationYComplianceOffThreshold =
+      std::max(0.0, std::min(rotationYComplianceOffThreshold, rotationYComplianceOnThreshold));
+  rotationYComplianceYThreshold = std::max(0.0, rotationYComplianceYThreshold);
+  complianceGain = std::max(0.0, complianceGain);
+  nominalPositionStiffness = std::max(0.0, nominalPositionStiffness);
+  nominalPositionDamping = std::max(0.0, nominalPositionDamping);
+  compliantPositionStiffness = std::max(0.0, compliantPositionStiffness);
+  compliantPositionDamping = compliantPositionDamping.cwiseMax(0.0);
+  nominalOrientationStiffness = nominalOrientationStiffness.cwiseMax(0.0);
+  nominalOrientationDamping = nominalOrientationDamping.cwiseMax(0.0);
+  compliantOrientationStiffness = compliantOrientationStiffness.cwiseMax(0.0);
+  compliantOrientationDamping = compliantOrientationDamping.cwiseMax(0.0);
+  xyForceCompliantOrientationStiffness = xyForceCompliantOrientationStiffness.cwiseMax(0.0);
+  xyForceCompliantOrientationDamping = xyForceCompliantOrientationDamping.cwiseMax(0.0);
+  rotationYCompliantOrientationStiffness = rotationYCompliantOrientationStiffness.cwiseMax(0.0);
+  rotationYCompliantOrientationDamping = rotationYCompliantOrientationDamping.cwiseMax(0.0);
+  gainTransitionTime = std::max(1e-3, gainTransitionTime);
+
+  currentPositionStiffness = nominalPositionStiffness;
+  currentPositionDamping = Eigen::Vector3d::Constant(nominalPositionDamping);
+  currentOrientationStiffness = nominalOrientationStiffness;
+  currentOrientationDamping = nominalOrientationDamping;
 }
 
 void BoxDemoController_Compliance::start(mc_control::fsm::Controller & ctl_)
@@ -50,14 +109,95 @@ void BoxDemoController_Compliance::start(mc_control::fsm::Controller & ctl_)
   refAccelFilterInitialized = false;
   xyForceTriggerActive = false;
   dFZComplianceActive = false;
-  ctl.gui()->addElement({"Controller"}, mc_rtc::gui::Button("Stop Demonstration", [this]() { stop = true; }),
-                        mc_rtc::gui::NumberInput(
-                            "Residual gain", [this]() { return residualGain; },
-                            [this](double gain)
-                            {
-                              updateGain = true;
-                              residualGain = std::max(0.1, gain);
-                            }));
+  rotationYComplianceActive = false;
+  currentPositionStiffness = nominalPositionStiffness;
+  currentPositionDamping = Eigen::Vector3d::Constant(nominalPositionDamping);
+  currentOrientationStiffness = nominalOrientationStiffness;
+  currentOrientationDamping = nominalOrientationDamping;
+  ctl.gui()->addElement(
+      {"Controller"}, mc_rtc::gui::Button("Stop Demonstration", [this]() { stop = true; }),
+      mc_rtc::gui::NumberInput(
+          "Residual gain", [this]() { return residualGain; },
+          [this](double gain)
+          {
+            updateGain = true;
+            residualGain = std::max(0.1, gain);
+          }),
+      mc_rtc::gui::NumberInput(
+          "XY compliance on threshold", [this]() { return xyComplianceOnThreshold; },
+          [this](double value) { xyComplianceOnThreshold = std::max(0.0, value); }),
+      mc_rtc::gui::NumberInput(
+          "XY compliance off threshold", [this]() { return xyComplianceOffThreshold; },
+          [this](double value) { xyComplianceOffThreshold = std::max(0.0, std::min(value, xyComplianceOnThreshold)); }),
+      mc_rtc::gui::NumberInput(
+          "dFz compliance on threshold", [this]() { return dFZComplianceOnThreshold; },
+          [this](double value) { dFZComplianceOnThreshold = std::max(0.0, value); }),
+      mc_rtc::gui::NumberInput(
+          "dFz compliance off threshold", [this]() { return dFZComplianceOffThreshold; }, [this](double value)
+          { dFZComplianceOffThreshold = std::max(0.0, std::min(value, dFZComplianceOnThreshold)); }),
+      mc_rtc::gui::NumberInput(
+          "Rotation Y compliance on threshold", [this]() { return rotationYComplianceOnThreshold; },
+          [this](double value) { rotationYComplianceOnThreshold = std::max(0.0, value); }),
+      mc_rtc::gui::NumberInput(
+          "Rotation Y compliance off threshold", [this]() { return rotationYComplianceOffThreshold; },
+          [this](double value)
+          { rotationYComplianceOffThreshold = std::max(0.0, std::min(value, rotationYComplianceOnThreshold)); }),
+      mc_rtc::gui::NumberInput(
+          "Rotation Y compliance X threshold", [this]() { return rotationYComplianceYThreshold; },
+          [this](double value) { rotationYComplianceYThreshold = std::max(0.0, value); }),
+      mc_rtc::gui::NumberInput(
+          "Compliance gain", [this]() { return complianceGain; },
+          [this](double value) { complianceGain = std::max(0.0, value); }),
+      mc_rtc::gui::NumberInput(
+          "Position nominal stiffness", [this]() { return nominalPositionStiffness; },
+          [this](double value) { nominalPositionStiffness = std::max(0.0, value); }),
+      mc_rtc::gui::NumberInput(
+          "Position nominal damping", [this]() { return nominalPositionDamping; },
+          [this](double value) { nominalPositionDamping = std::max(0.0, value); }),
+      mc_rtc::gui::NumberInput(
+          "Position compliant stiffness", [this]() { return compliantPositionStiffness; },
+          [this](double value) { compliantPositionStiffness = std::max(0.0, value); }),
+      mc_rtc::gui::ArrayInput(
+          "Position compliant damping", {"x", "y", "z"}, [this]() { return compliantPositionDamping; },
+          [this](const Eigen::Vector3d & value) { compliantPositionDamping = value.cwiseMax(0.0); }),
+      mc_rtc::gui::ArrayInput(
+          "Orientation nominal stiffness", {"x", "y", "z"}, [this]() { return nominalOrientationStiffness; },
+          [this](const Eigen::Vector3d & value) { nominalOrientationStiffness = value.cwiseMax(0.0); }),
+      mc_rtc::gui::ArrayInput(
+          "Orientation nominal damping", {"x", "y", "z"}, [this]() { return nominalOrientationDamping; },
+          [this](const Eigen::Vector3d & value) { nominalOrientationDamping = value.cwiseMax(0.0); }),
+      mc_rtc::gui::ArrayInput(
+          "Orientation compliant stiffness", {"x", "y", "z"}, [this]() { return compliantOrientationStiffness; },
+          [this](const Eigen::Vector3d & value)
+          {
+            compliantOrientationStiffness = value.cwiseMax(0.0);
+            xyForceCompliantOrientationStiffness = compliantOrientationStiffness;
+            rotationYCompliantOrientationStiffness = compliantOrientationStiffness;
+          }),
+      mc_rtc::gui::ArrayInput(
+          "Orientation compliant damping", {"x", "y", "z"}, [this]() { return compliantOrientationDamping; },
+          [this](const Eigen::Vector3d & value)
+          {
+            compliantOrientationDamping = value.cwiseMax(0.0);
+            xyForceCompliantOrientationDamping = compliantOrientationDamping;
+            rotationYCompliantOrientationDamping = compliantOrientationDamping;
+          }),
+      mc_rtc::gui::ArrayInput(
+          "XY force orientation stiffness", {"x", "y", "z"}, [this]() { return xyForceCompliantOrientationStiffness; },
+          [this](const Eigen::Vector3d & value) { xyForceCompliantOrientationStiffness = value.cwiseMax(0.0); }),
+      mc_rtc::gui::ArrayInput(
+          "XY force orientation damping", {"x", "y", "z"}, [this]() { return xyForceCompliantOrientationDamping; },
+          [this](const Eigen::Vector3d & value) { xyForceCompliantOrientationDamping = value.cwiseMax(0.0); }),
+      mc_rtc::gui::ArrayInput(
+          "Rotation Y orientation stiffness", {"x", "y", "z"},
+          [this]() { return rotationYCompliantOrientationStiffness; },
+          [this](const Eigen::Vector3d & value) { rotationYCompliantOrientationStiffness = value.cwiseMax(0.0); }),
+      mc_rtc::gui::ArrayInput(
+          "Rotation Y orientation damping", {"x", "y", "z"}, [this]() { return rotationYCompliantOrientationDamping; },
+          [this](const Eigen::Vector3d & value) { rotationYCompliantOrientationDamping = value.cwiseMax(0.0); }),
+      mc_rtc::gui::NumberInput(
+          "Gain transition time", [this]() { return gainTransitionTime; },
+          [this](double value) { gainTransitionTime = std::max(1e-3, value); }));
 
   jac_ft = rbd::Jacobian(robot.mb(), sensor_body);
   jac_task = rbd::Jacobian(robot.mb(), "tool");
@@ -65,9 +205,8 @@ void BoxDemoController_Compliance::start(mc_control::fsm::Controller & ctl_)
 
   ctl.eeTask->positionTask->stiffness(nominalPositionStiffness);
   ctl.eeTask->positionTask->damping(nominalPositionDamping);
-  ctl.eeTask->orientationTask->stiffness(30);
-  ctl.eeTask->orientationTask->damping(20);
-  ctl.postureTask->makeCompliant(false);
+  ctl.eeTask->orientationTask->setGains(nominalOrientationStiffness, nominalOrientationDamping);
+  ctl.postureTask->makeCompliant(true);
 
   ctl.datastore().assign<std::string>("ControlMode", "Torque");
   ctl.logger().addLogEntries(
@@ -85,7 +224,6 @@ void BoxDemoController_Compliance::start(mc_control::fsm::Controller & ctl_)
 
 bool BoxDemoController_Compliance::run(mc_control::fsm::Controller & ctl_)
 {
-  mc_rtc::log::info("========== new step ==========");
   auto & ctl = static_cast<BoxDemoController &>(ctl_);
   auto & robot = ctl.robot();
   if(updateGain)
@@ -95,14 +233,13 @@ bool BoxDemoController_Compliance::run(mc_control::fsm::Controller & ctl_)
     ctl.datastore().call<void, double>("EF_Estimator::setGain", residualGain);
   }
 
-  mc_rtc::log::info("robot state & = {}", fmt::ptr(&robot));
-
   auto R = ctl.robot().bodyPosW(robot.forceSensors()[0].parentBody()).rotation();
   Eigen::MatrixXd J_ft = jac_ft.jacobian(robot.mb(), robot.mbc());
   Eigen::MatrixXd J_task = jac_ft.jacobian(robot.mb(), robot.mbc());
   fd.computeH(robot.mb(), robot.mbc());
   const double dt = ctl.solver().dt();
   const double alpha = std::exp(-std::max(0.1, residualGain) * dt);
+  const double gainAlpha = std::exp(-dt / std::max(1e-3, gainTransitionTime));
 
   // Dual compliance logic implementation
   FsSensorRaw = robot.forceSensors()[0].wrenchWithoutGravity(robot).vector();
@@ -133,26 +270,54 @@ bool BoxDemoController_Compliance::run(mc_control::fsm::Controller & ctl_)
   dF = Fr - Fs;
   dA = Ar - As;
   comp = dA;
-  refAccelRaw = 1.0 * Ar_aug;
+  refAccelRaw = complianceGain * Ar_aug;
   refAccelRaw.head(3).setZero();
 
   const bool hadSoftPositionGains = xyForceTriggerActive || dFZComplianceActive;
-  const double normFxy = Fr.tail(3).head(2).norm();
+  const bool hadSoftOrientationGains = xyForceTriggerActive || rotationYComplianceActive;
+  const double normDFxy = dF.tail(3).head(2).norm();
+  const double absDTauY = std::abs(dF[1]);
   const double absDFz = std::abs(dF[5]);
+  const double currentToolX = ctl.eeTask->orientationTask->frame_->position().translation().y();
+  const bool allowRotationYCompliance = currentToolX > rotationYComplianceYThreshold;
 
-  if(normFxy > 10)
+  if(normDFxy > xyComplianceOnThreshold)
   {
+    refAccelRaw[2] = Ar[2];
+    refAccelRaw[3] = Ar[3];
+    refAccelRaw[4] = Ar[4];
     xyForceTriggerActive = true;
   }
   else
   {
-    if(normFxy < 1.5)
+    if(normDFxy < xyComplianceOffThreshold)
     {
+      refAccelRaw[2] = 0;
+      refAccelRaw[3] = 0;
+      refAccelRaw[4] = 0;
       xyForceTriggerActive = false;
     }
   }
 
-  if(absDFz > 10)
+  if(absDTauY > rotationYComplianceOnThreshold && allowRotationYCompliance)
+  {
+    refAccelRaw[1] = Ar[1];
+    rotationYComplianceActive = true;
+  }
+  else if(absDTauY < rotationYComplianceOffThreshold || !allowRotationYCompliance)
+  {
+    refAccelRaw[1] = 0;
+    if(absDTauY < rotationYComplianceOffThreshold)
+    {
+      rotationYComplianceActive = false;
+    }
+    if(!allowRotationYCompliance)
+    {
+      rotationYComplianceActive = false;
+    }
+  }
+
+  if(absDFz > dFZComplianceOnThreshold)
   {
     refAccelRaw[5] = comp[5];
     dFZComplianceActive = true;
@@ -160,27 +325,46 @@ bool BoxDemoController_Compliance::run(mc_control::fsm::Controller & ctl_)
   else
   {
     refAccelRaw[5] = 0;
-    if(absDFz < 1.5)
+    if(absDFz < dFZComplianceOffThreshold)
     {
       dFZComplianceActive = false;
     }
   }
 
   const bool hasSoftPositionGains = xyForceTriggerActive || dFZComplianceActive;
+  const bool hasSoftOrientationGains = xyForceTriggerActive || rotationYComplianceActive;
   if(hadSoftPositionGains && !hasSoftPositionGains)
   {
     ctl.eeTask->positionTask->reset();
   }
-  if(hasSoftPositionGains)
+  if(hadSoftOrientationGains && !hasSoftOrientationGains)
   {
-    ctl.eeTask->positionTask->stiffness(compliantPositionStiffness);
-    ctl.eeTask->positionTask->damping(compliantPositionDamping);
+    ctl.eeTask->orientationTask->reset();
   }
-  else
+  const double targetPositionStiffness = hasSoftPositionGains ? compliantPositionStiffness : nominalPositionStiffness;
+  const Eigen::Vector3d targetPositionDamping =
+      hasSoftPositionGains ? compliantPositionDamping : Eigen::Vector3d::Constant(nominalPositionDamping);
+  currentPositionStiffness = gainAlpha * currentPositionStiffness + (1.0 - gainAlpha) * targetPositionStiffness;
+  currentPositionDamping = gainAlpha * currentPositionDamping + (1.0 - gainAlpha) * targetPositionDamping;
+  ctl.eeTask->positionTask->setGains(Eigen::Vector3d::Constant(currentPositionStiffness), currentPositionDamping);
+  Eigen::Vector3d targetOrientationStiffness = nominalOrientationStiffness;
+  Eigen::Vector3d targetOrientationDamping = nominalOrientationDamping;
+  if(xyForceTriggerActive)
   {
-    ctl.eeTask->positionTask->stiffness(nominalPositionStiffness);
-    ctl.eeTask->positionTask->damping(nominalPositionDamping);
+    targetOrientationStiffness.x() = xyForceCompliantOrientationStiffness.x();
+    targetOrientationStiffness.z() = xyForceCompliantOrientationStiffness.z();
+    targetOrientationDamping.x() = xyForceCompliantOrientationDamping.x();
+    targetOrientationDamping.z() = xyForceCompliantOrientationDamping.z();
   }
+  if(rotationYComplianceActive)
+  {
+    targetOrientationStiffness.y() = rotationYCompliantOrientationStiffness.y();
+    targetOrientationDamping.y() = rotationYCompliantOrientationDamping.y();
+  }
+  currentOrientationStiffness =
+      gainAlpha * currentOrientationStiffness + (1.0 - gainAlpha) * targetOrientationStiffness;
+  currentOrientationDamping = gainAlpha * currentOrientationDamping + (1.0 - gainAlpha) * targetOrientationDamping;
+  ctl.eeTask->orientationTask->setGains(currentOrientationStiffness, currentOrientationDamping);
   ctl.eeTask->refAccel(refAccelRaw);
 
   // State output management

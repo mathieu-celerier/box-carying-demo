@@ -50,7 +50,31 @@ collisions:
 #     stiffness: 2
 #     weight: 100
 # Implement some additional text states
-states: {}
+states:
+  BoxDemoController_Compliance:
+    residualGain: 10.0
+    xyComplianceOnThreshold: 10.0
+    xyComplianceOffThreshold: 8
+    dFZComplianceOnThreshold: 10.0
+    dFZComplianceOffThreshold: 8
+    rotationYComplianceOnThreshold: 10.0
+    rotationYComplianceOffThreshold: 8.0
+    rotationYComplianceXThreshold: 0.3
+    complianceGain: 1.0
+    nominalPositionStiffness: 60.0
+    nominalPositionDamping: 40.0
+    compliantPositionStiffness: 0.0
+    compliantPositionDamping: [40.0, 30.0, 30.0]
+    nominalOrientationStiffness: [60.0, 60.0, 60.0]
+    nominalOrientationDamping: [20.0, 20.0, 30.0]
+    compliantOrientationStiffness: [60.0, 60.0, 0.0]
+    compliantOrientationDamping: [20.0, 20.0, 30.0]
+    xyForceCompliantOrientationStiffness: [60.0, 60.0, 0.0]
+    xyForceCompliantOrientationDamping: [20.0, 20.0, 30.0]
+    rotationYCompliantOrientationStiffness: [60.0, 0.0, 60.0]
+    rotationYCompliantOrientationDamping: [20.0, 30.0, 20.0]
+    gainTransitionTime: 0.3
+
 # Transitions map
 transitions:
   - [BoxDemoController_Initial, OK, BoxDemoController_Compliance, Strict]
@@ -60,12 +84,12 @@ init: BoxDemoController_Initial
 
 Plugins: [ExternalForcesEstimator]
 
+kinova_bota_ds4:
+  tool_frame: "FT_sensor_wrench"
+
 ObserverPipelines:
   - name: Pipeline
     observers:
       - type: Encoder
         config:
           velocity: encoderVelocities
-
-kinova_bota_ds4:
-  tool_frame: "FT_sensor_wrench"

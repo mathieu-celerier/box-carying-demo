@@ -19,7 +19,7 @@ BoxDemoController::BoxDemoController(mc_rbdyn::RobotModulePtr rm, double dt, con
                  {"joint_5", {0}}, {"joint_6", {0.96}},  {"joint_7", {1.57}}};
 
   eeTask = std::make_shared<mc_tasks::CompliantEndEffectorTask>(tool_frame, robots(), robot().robotIndex(), 2, 10000);
-  eeTask->orientationTask->orientation(Eigen::Quaterniond(1, -1, -1, -1).normalized().toRotationMatrix());
+  eeTask->orientationTask->orientation(Eigen::Quaterniond(1.2, -0.8, -0.8, -1.2).normalized().toRotationMatrix());
   eeTask->positionTask->position(Eigen::Vector3d(0.6, 0.0, 0.4));
   solver().addTask(eeTask);
 
@@ -29,6 +29,7 @@ BoxDemoController::BoxDemoController(mc_rbdyn::RobotModulePtr rm, double dt, con
   postureTask->stiffness(1.0);
   postureTask->damping(4.0);
   postureTask->target(postureHome);
+  postureTask->makeCompliant(true);
   solver().addTask(postureTask);
 
   datastore().make<std::string>("ControlMode", "Position");
