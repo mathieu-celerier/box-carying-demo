@@ -9,7 +9,8 @@ void BoxDemoController_Initial::start(mc_control::fsm::Controller & ctl_)
   auto & ctl = static_cast<BoxDemoController &>(ctl_);
 
   next = false;
-  ctl.gui()->addElement({"Controller"}, mc_rtc::gui::Button("Start Demonstration", [this]() { next = true; }));
+  ctl.datastore().assign<std::string>("ControlMode", "Position");
+  ctl.gui()->addElement(this, {"Controller"}, mc_rtc::gui::Button("Start Demonstration", [this]() { next = true; }));
 }
 
 bool BoxDemoController_Initial::run(mc_control::fsm::Controller & ctl_)
@@ -29,6 +30,7 @@ bool BoxDemoController_Initial::run(mc_control::fsm::Controller & ctl_)
 void BoxDemoController_Initial::teardown(mc_control::fsm::Controller & ctl_)
 {
   auto & ctl = static_cast<BoxDemoController &>(ctl_);
+  ctl.gui()->removeElements(this);
 }
 
 EXPORT_SINGLE_STATE("BoxDemoController_Initial", BoxDemoController_Initial)

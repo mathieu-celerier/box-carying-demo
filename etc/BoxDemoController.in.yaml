@@ -9,11 +9,11 @@ IdleKeepState: false
 # Where to look for state libraries
 StatesLibraries:
   - "@MC_STATES_DEFAULT_RUNTIME_INSTALL_PREFIX@"
-  - "@MC_STATES_RUNTIME_INSTALL_PREFIX@"
+  - "@STATES_INSTALL_PREFIX@/@PROJECT_NAME@/states"
 # Where to look for state files
 StatesFiles:
   - "@MC_STATES_DEFAULT_RUNTIME_INSTALL_PREFIX@/data"
-  - "@MC_STATES_RUNTIME_INSTALL_PREFIX@/data"
+  - "@STATES_INSTALL_PREFIX@/@PROJECT_NAME@/states/data"
 # If true, state factory will be more verbose
 VerboseStateFactory: false
 # Additional robots to load
@@ -51,34 +51,49 @@ collisions:
 #     weight: 100
 # Implement some additional text states
 states:
-  BoxDemoController_Compliance:
+  Compliance:
+    base: BoxDemoController_Compliance
+    toolFrame: "tool"
+    postureHome:
+      joint_1: [0]
+      joint_2: [0.262]
+      joint_3: [3.14]
+      joint_4: [-2.269]
+      joint_5: [0]
+      joint_6: [0.96]
+      joint_7: [1.57]
+    targetPosition: [0.6, 0.0, 0.4]
+    targetOrientationQuaternion: [1.0, -1.0, -1.0, -1.0]
+    workspaceConstraintEnabled: true
+    workspaceMin: [0.4, -0.8, -0.2]
+    workspaceMax: [1.0, 0.8, 0.7]
     residualGain: 10.0
-    xyComplianceOnThreshold: 10.0
-    xyComplianceOffThreshold: 8
+    planarTranslationTriggerOnThreshold: 10.0
+    planarTranslationTriggerOffThreshold: 8.0
+    rotationZTriggerOnThreshold: 1.5
+    rotationZTriggerOffThreshold: 1.0
     dFZComplianceOnThreshold: 10.0
-    dFZComplianceOffThreshold: 8
-    rotationYComplianceOnThreshold: 10.0
-    rotationYComplianceOffThreshold: 8.0
-    rotationYComplianceXThreshold: 0.3
+    dFZComplianceOffThreshold: 8.0
+    triggerAveragingWindow: 0.1
     complianceGain: 1.0
-    nominalPositionStiffness: 60.0
+    nominalPositionStiffness: 100.0
     nominalPositionDamping: 40.0
-    compliantPositionStiffness: 0.0
-    compliantPositionDamping: [40.0, 30.0, 30.0]
-    nominalOrientationStiffness: [60.0, 60.0, 60.0]
-    nominalOrientationDamping: [20.0, 20.0, 30.0]
-    compliantOrientationStiffness: [60.0, 60.0, 0.0]
-    compliantOrientationDamping: [20.0, 20.0, 30.0]
-    xyForceCompliantOrientationStiffness: [60.0, 60.0, 0.0]
-    xyForceCompliantOrientationDamping: [20.0, 20.0, 30.0]
-    rotationYCompliantOrientationStiffness: [60.0, 0.0, 60.0]
-    rotationYCompliantOrientationDamping: [20.0, 30.0, 20.0]
-    gainTransitionTime: 0.3
+    planarTranslationStiffness: 0.0
+    planarTranslationDamping: [20.0, 20.0, 30.0]
+    nominalOrientationStiffness: [100.0, 100.0, 100.0]
+    nominalOrientationDamping: [40.0, 40.0, 40.0]
+    exclusiveComplianceModes: false
+    orientationManagementMode: "Compliance"
+    rotationZOrientationStiffness: 0.0
+    rotationZOrientationDamping: 20.0
+    worldZTorqueToLocalYGain: 0.1
+    maxLocalYOrientationOffset: 1.2
+    gainTransitionTime: 0.4
 
 # Transitions map
 transitions:
-  - [BoxDemoController_Initial, OK, BoxDemoController_Compliance, Strict]
-  - [BoxDemoController_Compliance, OK, BoxDemoController_Initial, Strict]
+  - [BoxDemoController_Initial, OK, Compliance, Auto]
+  - [Compliance, OK, BoxDemoController_Initial, Auto]
 # Initial state
 init: BoxDemoController_Initial
 
